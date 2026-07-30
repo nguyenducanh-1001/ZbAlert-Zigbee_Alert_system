@@ -55,6 +55,8 @@ void setup() {
 void loop() {
   handleSerial();
   handlePendingAlarmAction();
+  checkPirTimeout();
+  checkDevicesOffline();
 
   static unsigned long lastScan = 0;
   if (millis() - lastScan >= DEVICE_SCAN_INTERVAL_MS) {

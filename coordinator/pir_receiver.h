@@ -35,6 +35,8 @@ public:
 
 private:
   zb_device_params_t *_device;
+  unsigned long _devicePendingSince = 0;  // thời điểm _device được gán, dùng để phát hiện bind bị treo
+  static const unsigned long BIND_PENDING_TIMEOUT_MS = 8000UL;
   void (*_on_occupancy)(bool motion, uint8_t srcEndpoint, uint16_t shortAddr);
 
   bool alreadyBound(const zb_device_params_t *device) {
@@ -118,6 +120,34 @@ private:
       return;
     }
 
+    // esp-zigbee-sdk đôi lúc gọi callback match 2 lần cho cùng 1 thiết bị
+    // (do broadcast response bị lặp ở tầng mạng). Nếu đang có 1 bind request
+    // khác chưa xong (_device != nullptr), KHÔNG được ghi đè ngay - nếu không
+    // bindCb() của request cũ sẽ đọc nhầm dữ liệu, tạo ra 1 "device ma" với
+    // địa chỉ sai (0xFFFF/255).
+    // NHƯNG: nếu bindCb() không bao giờ được gọi (request bị rớt/timeout mà
+    // SDK không báo lỗi) thì _device sẽ kẹt mãi mãi -> phải có timeout để tự
+    // giải phóng, không thì mọi lần bind sau đều bị chặn vĩnh viễn.
+    if (instance->_device != nullptr) {
+      unsigned long pendingFor = millis() - instance->_devicePendingSince;
+
+      if (pendingFor < BIND_PENDING_TIMEOUT_MS) {
+        Serial.printf(
+          "Bo qua findCb: dang co bind request khac dang cho short=0x%04X (%lums).\n",
+          instance->_device->short_addr,
+          pendingFor
+        );
+        free(sensor);
+        return;
+      }
+
+      Serial.printf(
+        "Bind request cu (short=0x%04X) bi treo qua %lums, huy va thu lai.\n", instance->_device->short_addr, pendingFor
+      );
+      free(instance->_device);
+      instance->_device = nullptr;
+    }
+
     esp_zb_zdo_bind_req_param_t bindReq;
     memset(&bindReq, 0, sizeof(bindReq));
     bindReq.req_dst_addr = addr;
@@ -129,6 +159,7 @@ private:
     bindReq.dst_endp = instance->_endpoint;
 
     instance->_device = sensor;
+    instance->_devicePendingSince = millis();
     Serial.printf("Binding PIR sensor: short=0x%04X endpoint=%u\n", addr, endpoint);
     esp_zb_zdo_device_bind_req(&bindReq, ZigbeePirReceiver::bindCbWrapper, this);
   }

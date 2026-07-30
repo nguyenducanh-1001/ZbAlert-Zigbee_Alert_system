@@ -16,10 +16,17 @@ void setup() {
   setAlarmState(false);
 
   zbAlarm.setManufacturerAndModel("Espressif", "AlarmNode");
+
+  // callback nhận lệnh On/Off từ coordinator
   zbAlarm.onLightChange(setAlarmState);
+
   Zigbee.addEndpoint(&zbAlarm);
 
-  if (!Zigbee.begin(ZIGBEE_ROUTER)) {
+  // End Device (không sleep, vì cần luôn lắng nghe lệnh) - KHÔNG dùng Router,
+  // vì Router có thể bị các thiết bị khác (như sensor) chọn làm parent trong
+  // mesh -> tắt nguồn Alarm sẽ kéo theo mất luôn cả sensor. End Device không
+  // bao giờ làm parent cho ai, tránh phụ thuộc chéo này.
+  if (!Zigbee.begin(ZIGBEE_END_DEVICE)) {
     Serial.println("Zigbee init failed, restarting...");
     ESP.restart();
   }
@@ -36,9 +43,15 @@ void loop() {
   handleFactoryResetButton();
 
   bool connected = Zigbee.connected();
+
   if (connected != lastConnected) {
     lastConnected = connected;
-    Serial.println(connected ? "Connected" : "Disconnected");
+
+    if (connected) {
+      Serial.println("Connected");
+    } else {
+      Serial.println("Disconnected");
+    }
   }
 
   delay(500);

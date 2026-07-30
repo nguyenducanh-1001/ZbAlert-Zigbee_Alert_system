@@ -20,6 +20,10 @@
 #define ALARM_ACTION_ON 1
 #define ALARM_ACTION_OFF 2
 
+#define MOTION_TIMEOUT_MS 30000UL
+
+#define DEVICE_OFFLINE_TIMEOUT_MS 30000UL
+
 enum CoordinatorMode : uint8_t {
   MODE_AUTO_PIR = 1,
   MODE_MANUAL = 2,

@@ -2,11 +2,15 @@
 #include "config.h"
 #include "Zigbee.h"
 #include "pir_sensor.h"
+#include "watchdog.h"
 
 void setup() {
+#ifdef RGB_BUILTIN
+  rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
+#endif
+  setupWatchdog();
   Serial.begin(115200);
   delay(500);
-
   pinMode(PIR_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
 #ifdef BOOT_PIN
@@ -38,6 +42,7 @@ void setup() {
 }
 
 void loop() {
+  feedWatchdog();
   handleFactoryResetButton();
 
   bool connected = Zigbee.connected();

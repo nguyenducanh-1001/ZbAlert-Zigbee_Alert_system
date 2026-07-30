@@ -65,6 +65,27 @@ void sendAlarmOff(bool announce = true) {
   }
 }
 
+void sendAlarmToggle(bool announce = true) {
+  syncBoundDevices();
+  int index = firstAlarmDevice();
+  announceNextStateReport = announce;
+
+  if (index >= 0) {
+    printTarget(index, "Alarm TOGGLE", announce);
+    zbSwitch.lightToggle(devices[index].endpoint, devices[index].shortAddr);
+    return;
+  }
+
+  if (zbSwitch.bound()) {
+    if (announce || verboseLog) {
+      Serial.println("Alarm endpoint not found. Sending TOGGLE to all bound On/Off devices.");
+    }
+    zbSwitch.lightToggle();
+  } else if (announce || verboseLog) {
+    Serial.println("No bound alarm/light yet. Pair alarm_node first.");
+  }
+}
+
 void readAlarmState(bool announce = true) {
   syncBoundDevices();
   int index = firstAlarmDevice();
@@ -97,6 +118,12 @@ void onLightStateChange(bool state) {
       devices[i].lastStateKnown = true;
       devices[i].lastState = state;
       devices[i].lastSeenMs = millis();
+      devices[i].lastTrafficMs = millis();
+
+      if (devices[i].offlineNotified) {
+        Serial.printf("Device short=0x%04X endpoint=%u da online tro lai.\n", devices[i].shortAddr, devices[i].endpoint);
+        devices[i].offlineNotified = false;
+      }
     }
   }
 }

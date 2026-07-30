@@ -1,5 +1,6 @@
 #pragma once
 
+#include "watchdog.h"
 #include "Zigbee.h"
 #include "config.h"
 
@@ -39,6 +40,7 @@ void reportPirState(bool motion, const char *reason) {
 void waitForNetwork() {
   Serial.print("Connecting to Zigbee network");
   while (!Zigbee.connected()) {
+    feedWatchdog();
     unsigned long now = millis();
     bool motion = readPir();
     setDebugLed(motion);
@@ -66,6 +68,7 @@ void handleFactoryResetButton() {
   unsigned long pressedAt = millis();
 
   while (digitalRead(BOOT_PIN) == LOW) {
+    feedWatchdog();
     setDebugLed((millis() / 150) % 2 == 0);
     delay(50);
 

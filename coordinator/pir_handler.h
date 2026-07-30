@@ -77,3 +77,27 @@ void handlePendingAlarmAction() {
     sendAlarmOff(false);
   }
 }
+
+// Failsafe: nếu đang coi là MOTION (nên alarm đang ON) mà quá lâu không có
+// báo cáo PIR mới (cả report thay đổi lẫn heartbeat) - rất có thể sensor đã
+// mất kết nối/rớt mạng - tự tắt alarm để tránh bật mãi mãi.
+void checkPirTimeout() {
+  if (currentMode != MODE_AUTO_PIR) {
+    return;
+  }
+  if (!lastPirKnown || !lastPirMotion) {
+    return;
+  }
+  if (millis() - lastPirReportMs < MOTION_TIMEOUT_MS) {
+    return;
+  }
+
+  Serial.printf(
+    "PIR timeout: khong co bao cao moi tu short=0x%04X trong %lus -> failsafe tat alarm.\n",
+    lastPirShortAddr,
+    MOTION_TIMEOUT_MS / 1000UL
+  );
+
+  lastPirMotion = false;  // tránh lặp lại failsafe mỗi vòng loop
+  pendingAlarmAction = ALARM_ACTION_OFF;
+}

@@ -20,6 +20,7 @@ void printHelp() {
   Serial.println("  close      - close Zigbee network");
   Serial.println("  on         - turn alarm/light ON");
   Serial.println("  off        - turn alarm/light OFF");
+  Serial.println("  toggle     - toggle alarm/light");
   Serial.println("  state      - read alarm/light state");
   Serial.println("  test       - turn ON for 2 seconds, then OFF");
   Serial.println("  reset      - Zigbee factory reset");
@@ -77,6 +78,17 @@ void printDevices() {
       Serial.printf(" seen=%lus", (millis() - devices[i].lastSeenMs) / 1000UL);
     }
 
+    if (devices[i].lastTrafficMs > 0) {
+      unsigned long sinceTraffic = (millis() - devices[i].lastTrafficMs) / 1000UL;
+      if (devices[i].offlineNotified) {
+        Serial.printf(" [OFFLINE %lus]", sinceTraffic);
+      } else {
+        Serial.printf(" traffic=%lus", sinceTraffic);
+      }
+    } else {
+      Serial.print(" [chua co traffic]");
+    }
+
     Serial.println();
   }
 
@@ -115,6 +127,8 @@ void handleCommand(String command) {
     sendAlarmOn();
   } else if (command == "off") {
     sendAlarmOff();
+  } else if (command == "toggle") {
+    sendAlarmToggle();
   } else if (command == "state") {
     readAlarmState();
   } else if (command == "test") {
