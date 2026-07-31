@@ -3,6 +3,9 @@
 #include "Zigbee.h"
 #include "pir_sensor.h"
 #include "watchdog.h"
+#include "battery.h"
+
+unsigned long lastBatteryReport = 0;
 
 void setup() {
 #ifdef RGB_BUILTIN
@@ -11,6 +14,7 @@ void setup() {
   setupWatchdog();
   Serial.begin(115200);
   delay(500);
+
   pinMode(PIR_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
 #ifdef BOOT_PIN
@@ -24,6 +28,9 @@ void setup() {
 
   zbPir.setManufacturerAndModel("Espressif", "PirNode");
   zbPir.setSensorType(ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_PIR);
+
+  // Khai báo đây là thiết bị chạy pin, % pin + điện áp ban đầu đo được ngay lúc boot
+  zbPir.setPowerSource(ZB_POWER_SOURCE_BATTERY, readBatteryPercentage(), readBatteryVoltage100mV());
 
   Serial.println();
   Serial.println("Adding PIR occupancy endpoint...");
@@ -39,6 +46,9 @@ void setup() {
 
   reportPirState(confirmedPirState, "boot");
   lastHeartbeatReport = millis();
+
+  reportBattery();
+  lastBatteryReport = millis();
 }
 
 void loop() {
@@ -73,6 +83,11 @@ void loop() {
   if (millis() - lastHeartbeatReport >= HEARTBEAT_REPORT_INTERVAL_MS) {
     reportPirState(confirmedPirState, "heartbeat");
     lastHeartbeatReport = millis();
+  }
+
+  if (millis() - lastBatteryReport >= BATTERY_REPORT_INTERVAL_MS) {
+    reportBattery();
+    lastBatteryReport = millis();
   }
 
   delay(20);

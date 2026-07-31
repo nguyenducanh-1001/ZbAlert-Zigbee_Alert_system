@@ -15,6 +15,8 @@ struct DeviceRecord {
   bool lastState;
   bool occupancyKnown;
   bool occupancy;
+  bool batteryKnown;
+  uint8_t batteryPercent;
   unsigned long lastSeenMs;     // lần cuối còn trong bảng bind (không phản ánh online/offline thật)
   unsigned long lastTrafficMs;  // lần cuối THỰC SỰ nhận được dữ liệu (0 = chưa từng)
   bool offlineNotified;
@@ -95,6 +97,8 @@ void addOrUpdateDevice(const zb_device_params_t *dev, bool seen[]) {
     devices[index].lastState = false;
     devices[index].occupancyKnown = false;
     devices[index].occupancy = false;
+    devices[index].batteryKnown = false;
+    devices[index].batteryPercent = 0;
     devices[index].lastSeenMs = millis();
     devices[index].lastTrafficMs = 0;
     devices[index].offlineNotified = false;
@@ -154,6 +158,26 @@ void markPirReport(uint8_t endpoint, uint16_t shortAddr, bool motion) {
     if (devices[i].endpoint == endpoint && devices[i].shortAddr == shortAddr) {
       devices[i].occupancyKnown = true;
       devices[i].occupancy = motion;
+      devices[i].lastSeenMs = millis();
+      devices[i].lastTrafficMs = millis();
+
+      if (devices[i].offlineNotified) {
+        Serial.printf("Device short=0x%04X endpoint=%u da online tro lai.\n", shortAddr, endpoint);
+        devices[i].offlineNotified = false;
+      }
+    }
+  }
+}
+
+void markBatteryReport(uint8_t endpoint, uint16_t shortAddr, uint8_t percent) {
+  for (uint8_t i = 0; i < MAX_DEVICES; i++) {
+    if (!devices[i].active) {
+      continue;
+    }
+
+    if (devices[i].endpoint == endpoint && devices[i].shortAddr == shortAddr) {
+      devices[i].batteryKnown = true;
+      devices[i].batteryPercent = percent;
       devices[i].lastSeenMs = millis();
       devices[i].lastTrafficMs = millis();
 

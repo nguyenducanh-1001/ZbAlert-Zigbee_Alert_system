@@ -2,6 +2,7 @@
 
 #include "Zigbee.h"
 #include "ha/esp_zigbee_ha_standard.h"
+#include "zcl/esp_zigbee_zcl_power_config.h"
 
 // định nghĩa ở pir_handler.h, dùng làm callback occupancy
 void onPirReport(bool motion, uint8_t srcEndpoint, uint16_t shortAddr);
@@ -20,6 +21,9 @@ public:
     esp_zb_cluster_list_add_occupancy_sensing_cluster(
       _cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE
     );
+    esp_zb_cluster_list_add_power_config_cluster(
+      _cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE
+    );
 
     _ep_config = {
       .endpoint = _endpoint,
@@ -33,11 +37,22 @@ public:
     _on_occupancy = callback;
   }
 
+  void onBatteryChange(void (*callback)(uint8_t percent, uint8_t srcEndpoint, uint16_t shortAddr)) {
+    _on_battery = callback;
+  }
+
 private:
   zb_device_params_t *_device;
   unsigned long _devicePendingSince = 0;  // thời điểm _device được gán, dùng để phát hiện bind bị treo
   static const unsigned long BIND_PENDING_TIMEOUT_MS = 8000UL;
   void (*_on_occupancy)(bool motion, uint8_t srcEndpoint, uint16_t shortAddr);
+  void (*_on_battery)(uint8_t percent, uint8_t srcEndpoint, uint16_t shortAddr) = nullptr;
+
+  // Theo dõi bind Power Config riêng, chống bind trùng khi findCb() bị SDK
+  // gọi lặp (bug đã biết) - nếu không sẽ bind 2 lần -> report bị nhân đôi.
+  bool _powerConfigBound = false;
+  bool _powerConfigPending = false;
+  unsigned long _powerConfigPendingSince = 0;
 
   bool alreadyBound(const zb_device_params_t *device) {
     for (const auto &bound : _bound_devices) {
@@ -92,6 +107,27 @@ private:
     ZigbeePirReceiver *instance = static_cast<ZigbeePirReceiver *>(user_ctx);
     if (instance != nullptr) {
       instance->bindCb(zdo_status, user_ctx);
+    }
+  }
+
+  // Bind cho Power Config cluster (báo % pin) - có guard chống bind trùng
+  // giống hệt cơ chế bên occupancy, vì findCb() cũng có thể bị gọi lặp cho
+  // cluster này.
+  void bindPowerConfigCb(esp_zb_zdp_status_t zdo_status) {
+    _powerConfigPending = false;
+
+    if (zdo_status == ESP_ZB_ZDP_STATUS_SUCCESS) {
+      _powerConfigBound = true;
+      Serial.println("Power Config (battery) bound thanh cong.");
+    } else {
+      Serial.printf("Power Config bind failed, status=%u\n", zdo_status);
+    }
+  }
+
+  static void bindPowerConfigCbWrapper(esp_zb_zdp_status_t zdo_status, void *user_ctx) {
+    ZigbeePirReceiver *instance = static_cast<ZigbeePirReceiver *>(user_ctx);
+    if (instance != nullptr) {
+      instance->bindPowerConfigCb(zdo_status);
     }
   }
 
@@ -162,6 +198,40 @@ private:
     instance->_devicePendingSince = millis();
     Serial.printf("Binding PIR sensor: short=0x%04X endpoint=%u\n", addr, endpoint);
     esp_zb_zdo_device_bind_req(&bindReq, ZigbeePirReceiver::bindCbWrapper, this);
+
+    // Bind thêm cho Power Config (báo pin) trên cùng thiết bị/endpoint -
+    // Zigbee bind theo từng cluster riêng nên cần 1 request bind_req khác.
+    // Có guard chống trùng giống occupancy - nếu không, findCb() bị SDK gọi
+    // lặp sẽ bind Power Config 2 lần -> báo pin bị nhân đôi mỗi lần report.
+    bool skipPowerConfigBind = false;
+
+    if (instance->_powerConfigBound) {
+      skipPowerConfigBind = true;
+    } else if (instance->_powerConfigPending) {
+      unsigned long pcPendingFor = millis() - instance->_powerConfigPendingSince;
+      if (pcPendingFor < BIND_PENDING_TIMEOUT_MS) {
+        skipPowerConfigBind = true;
+      } else {
+        Serial.println("Power Config bind cu bi treo qua lau, huy va thu lai.");
+        instance->_powerConfigPending = false;
+      }
+    }
+
+    if (!skipPowerConfigBind) {
+      esp_zb_zdo_bind_req_param_t batteryBindReq;
+      memset(&batteryBindReq, 0, sizeof(batteryBindReq));
+      batteryBindReq.req_dst_addr = addr;
+      memcpy(batteryBindReq.src_address, sensor->ieee_addr, sizeof(esp_zb_ieee_addr_t));
+      batteryBindReq.src_endp = endpoint;
+      batteryBindReq.cluster_id = ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG;
+      batteryBindReq.dst_addr_mode = ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED;
+      esp_zb_get_long_address(batteryBindReq.dst_address_u.addr_long);
+      batteryBindReq.dst_endp = instance->_endpoint;
+
+      instance->_powerConfigPending = true;
+      instance->_powerConfigPendingSince = millis();
+      esp_zb_zdo_device_bind_req(&batteryBindReq, ZigbeePirReceiver::bindPowerConfigCbWrapper, this);
+    }
   }
 
   static void findCbWrapper(esp_zb_zdp_status_t zdo_status, uint16_t addr, uint8_t endpoint, void *user_ctx) {
@@ -172,12 +242,12 @@ private:
   }
 
   void findEndpoint(esp_zb_zdo_match_desc_req_param_t *cmd_req) override {
-    uint16_t clusterList[] = {ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING};
+    uint16_t clusterList[] = {ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG};
     esp_zb_zdo_match_desc_req_param_t occupancyReq = {
       .dst_nwk_addr = cmd_req->dst_nwk_addr,
       .addr_of_interest = cmd_req->addr_of_interest,
       .profile_id = ESP_ZB_AF_HA_PROFILE_ID,
-      .num_in_clusters = 1,
+      .num_in_clusters = 2,
       .num_out_clusters = 0,
       .cluster_list = clusterList,
     };
@@ -186,6 +256,21 @@ private:
   }
 
   void zbAttributeRead(uint16_t cluster_id, const esp_zb_zcl_attribute_t *attribute, uint8_t src_endpoint, esp_zb_zcl_addr_t src_address) override {
+    if (cluster_id == ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG) {
+      if (attribute->id != ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID || attribute->data.value == nullptr) {
+        return;
+      }
+
+      // Chuẩn Zigbee: giá trị này tính theo đơn vị 0.5% (200 = 100%)
+      uint8_t raw = *(uint8_t *)attribute->data.value;
+      uint8_t percent = raw / 2;
+
+      if (_on_battery != nullptr) {
+        _on_battery(percent, src_endpoint, src_address.u.short_addr);
+      }
+      return;
+    }
+
     if (cluster_id != ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
       return;
     }

@@ -74,6 +74,10 @@ void printDevices() {
       }
     }
 
+    if (devices[i].batteryKnown) {
+      Serial.printf(" battery=%u%%", devices[i].batteryPercent);
+    }
+
     if (devices[i].lastSeenMs > 0) {
       Serial.printf(" seen=%lus", (millis() - devices[i].lastSeenMs) / 1000UL);
     }

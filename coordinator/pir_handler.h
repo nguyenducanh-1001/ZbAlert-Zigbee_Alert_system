@@ -63,6 +63,26 @@ void onPirReport(bool motion, uint8_t srcEndpoint, uint16_t shortAddr) {
   }
 }
 
+unsigned long lastBatteryReportMs = 0;
+// Cửa sổ lọc trùng: gói bị tầng radio gửi lại (retransmit do mất ACK) sẽ đến
+// rất gần nhau (thường <1s); chu kỳ report thật sự cách nhau hàng chục giây
+// (BATTERY_REPORT_INTERVAL_MS bên sensor). 3s đủ rộng để lọc trùng mà không
+// bao giờ chặn nhầm 1 report thật.
+const unsigned long BATTERY_DEDUP_WINDOW_MS = 3000UL;
+
+void onBatteryReport(uint8_t percent, uint8_t srcEndpoint, uint16_t shortAddr) {
+  unsigned long now = millis();
+
+  if (now - lastBatteryReportMs < BATTERY_DEDUP_WINDOW_MS) {
+    logf("Bo qua battery report trung (den qua gan lan truoc, khoang %lums).\n", now - lastBatteryReportMs);
+    return;
+  }
+  lastBatteryReportMs = now;
+
+  markBatteryReport(srcEndpoint, shortAddr, percent);
+  Serial.printf("Battery report: %u%% from short=0x%04X endpoint=%u\n", percent, shortAddr, srcEndpoint);
+}
+
 void handlePendingAlarmAction() {
   uint8_t action = pendingAlarmAction;
   if (action == ALARM_ACTION_NONE) {
@@ -93,9 +113,7 @@ void checkPirTimeout() {
   }
 
   Serial.printf(
-    "PIR timeout: khong co bao cao moi tu short=0x%04X trong %lus -> failsafe tat alarm.\n",
-    lastPirShortAddr,
-    MOTION_TIMEOUT_MS / 1000UL
+    "PIR timeout: khong co bao cao moi tu short=0x%04X trong %lus -> failsafe tat alarm.\n", lastPirShortAddr, MOTION_TIMEOUT_MS / 1000UL
   );
 
   lastPirMotion = false;  // tránh lặp lại failsafe mỗi vòng loop

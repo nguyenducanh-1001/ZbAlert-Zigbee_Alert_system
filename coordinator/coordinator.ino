@@ -29,6 +29,7 @@ void setup() {
   zbPirReceiver.setManufacturerAndModel("Espressif", "PirReceiver");
   zbPirReceiver.allowMultipleBinding(true);
   zbPirReceiver.onOccupancyChange(onPirReport);
+  zbPirReceiver.onBatteryChange(onBatteryReport);
 
   Zigbee.allowMultiEndpointBinding(true);
 
