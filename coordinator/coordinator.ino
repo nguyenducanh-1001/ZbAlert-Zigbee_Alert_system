@@ -11,6 +11,7 @@
 #include "alarm_control.h"
 #include "pir_handler.h"
 #include "serial_commands.h"
+#include "ota_server.h"
 
 void setup() {
 #ifdef RGB_BUILTIN
