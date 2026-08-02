@@ -4,6 +4,7 @@
 #include "pir_sensor.h"
 #include "watchdog.h"
 #include "battery.h"
+#include "ota_client.h"
 
 unsigned long lastBatteryReport = 0;
 
