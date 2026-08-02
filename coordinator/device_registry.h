@@ -5,6 +5,7 @@
 #include "config.h"
 #include "endpoints.h"
 #include "logging.h"
+#include "uart_link.h"
 
 struct DeviceRecord {
   uint16_t shortAddr;
@@ -111,6 +112,7 @@ void addOrUpdateDevice(const zb_device_params_t *dev, bool seen[]) {
       dev->endpoint,
       Zigbee.formatIEEEAddress(dev->ieee_addr)
     );
+    publishDeviceEvent("joined", dev->short_addr, dev->endpoint);
   }
 
   saveDevice(index, dev);
@@ -149,6 +151,21 @@ int firstAlarmDevice() {
   return -1;
 }
 
+// Dùng chung cho mọi nơi vừa nhận traffic thật (state report, PIR report,
+// battery report) - nếu thiết bị trước đó bị đánh dấu offline thì clear cờ
+// và báo "online tro lai" đúng 1 lần. Gộp lại thay vì lặp code này ở 3 chỗ
+// (onLightStateChange, markPirReport, markBatteryReport) để tránh 1 chỗ sửa
+// message mà quên chỗ khác.
+void markDeviceOnline(uint8_t index) {
+  if (!devices[index].offlineNotified) {
+    return;
+  }
+
+  Serial.printf("Device short=0x%04X endpoint=%u da online tro lai.\n", devices[index].shortAddr, devices[index].endpoint);
+  publishDeviceEvent("online", devices[index].shortAddr, devices[index].endpoint);
+  devices[index].offlineNotified = false;
+}
+
 void markPirReport(uint8_t endpoint, uint16_t shortAddr, bool motion) {
   for (uint8_t i = 0; i < MAX_DEVICES; i++) {
     if (!devices[i].active) {
@@ -160,11 +177,7 @@ void markPirReport(uint8_t endpoint, uint16_t shortAddr, bool motion) {
       devices[i].occupancy = motion;
       devices[i].lastSeenMs = millis();
       devices[i].lastTrafficMs = millis();
-
-      if (devices[i].offlineNotified) {
-        Serial.printf("Device short=0x%04X endpoint=%u da online tro lai.\n", shortAddr, endpoint);
-        devices[i].offlineNotified = false;
-      }
+      markDeviceOnline(i);
     }
   }
 }
@@ -180,11 +193,7 @@ void markBatteryReport(uint8_t endpoint, uint16_t shortAddr, uint8_t percent) {
       devices[i].batteryPercent = percent;
       devices[i].lastSeenMs = millis();
       devices[i].lastTrafficMs = millis();
-
-      if (devices[i].offlineNotified) {
-        Serial.printf("Device short=0x%04X endpoint=%u da online tro lai.\n", shortAddr, endpoint);
-        devices[i].offlineNotified = false;
-      }
+      markDeviceOnline(i);
     }
   }
 }
@@ -213,6 +222,7 @@ void checkDevicesOffline() {
       devices[i].endpoint,
       DEVICE_OFFLINE_TIMEOUT_MS / 1000UL
     );
+    publishDeviceEvent("offline", devices[i].shortAddr, devices[i].endpoint);
     devices[i].offlineNotified = true;
   }
 }

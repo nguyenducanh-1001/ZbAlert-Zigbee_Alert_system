@@ -6,6 +6,7 @@
 
 #include "pir_receiver.h"
 #include "endpoints.h"
+#include "uart_link.h"
 #include "device_registry.h"
 #include "alarm_control.h"
 #include "pir_handler.h"
@@ -19,6 +20,8 @@ void setup() {
   Serial.begin(115200);
   Serial.setTimeout(50);
   delay(500);
+
+  setupUartBridge();
 
   memset(devices, 0, sizeof(devices));
 
@@ -68,7 +71,7 @@ void loop() {
   static unsigned long lastPoll = 0;
   if (millis() - lastPoll >= STATE_POLL_INTERVAL_MS) {
     if (zbSwitch.bound()) {
-      readAlarmState(false);  // false = tự động, im lặng trừ khi bật "verbose"
+      readAlarmState(false);  // false = tu dong, im lang tru khi bat "debug"
     }
     lastPoll = millis();
   }

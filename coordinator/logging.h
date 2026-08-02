@@ -4,10 +4,6 @@
 
 bool verboseLog = false;
 
-void logln(const char *msg) {
-  if (verboseLog) Serial.println(msg);
-}
-
 void logf(const char *fmt, ...) {
   if (!verboseLog) return;
   char buf[160];

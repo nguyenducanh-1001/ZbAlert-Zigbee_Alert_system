@@ -4,6 +4,7 @@
 #include "endpoints.h"
 #include "device_registry.h"
 #include "logging.h"
+#include "uart_link.h"
 
 // Khi hàm được gọi tự động (mode 1, poll định kỳ) truyền announce=false để im lặng;
 // khi người dùng gõ lệnh, giữ mặc định announce=true để luôn thấy kết quả.
@@ -65,27 +66,6 @@ void sendAlarmOff(bool announce = true) {
   }
 }
 
-void sendAlarmToggle(bool announce = true) {
-  syncBoundDevices();
-  int index = firstAlarmDevice();
-  announceNextStateReport = announce;
-
-  if (index >= 0) {
-    printTarget(index, "Alarm TOGGLE", announce);
-    zbSwitch.lightToggle(devices[index].endpoint, devices[index].shortAddr);
-    return;
-  }
-
-  if (zbSwitch.bound()) {
-    if (announce || verboseLog) {
-      Serial.println("Alarm endpoint not found. Sending TOGGLE to all bound On/Off devices.");
-    }
-    zbSwitch.lightToggle();
-  } else if (announce || verboseLog) {
-    Serial.println("No bound alarm/light yet. Pair alarm_node first.");
-  }
-}
-
 void readAlarmState(bool announce = true) {
   syncBoundDevices();
   int index = firstAlarmDevice();
@@ -112,6 +92,7 @@ void onLightStateChange(bool state) {
     Serial.printf("Light/alarm state report: %s\n", state ? "ON" : "OFF");
   }
   announceNextStateReport = false;
+  // Alarm không nằm trong 3 event gửi cloud (motion/clear/battery) - chỉ giữ log local.
 
   for (uint8_t i = 0; i < MAX_DEVICES; i++) {
     if (devices[i].active && devices[i].endpoint == ALARM_ENDPOINT) {
@@ -119,11 +100,7 @@ void onLightStateChange(bool state) {
       devices[i].lastState = state;
       devices[i].lastSeenMs = millis();
       devices[i].lastTrafficMs = millis();
-
-      if (devices[i].offlineNotified) {
-        Serial.printf("Device short=0x%04X endpoint=%u da online tro lai.\n", devices[i].shortAddr, devices[i].endpoint);
-        devices[i].offlineNotified = false;
-      }
+      markDeviceOnline(i);
     }
   }
 }

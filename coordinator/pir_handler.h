@@ -4,6 +4,7 @@
 #include "device_registry.h"
 #include "alarm_control.h"
 #include "logging.h"
+#include "uart_link.h"
 
 CoordinatorMode currentMode = MODE_AUTO_PIR;
 volatile uint8_t pendingAlarmAction = ALARM_ACTION_NONE;
@@ -49,14 +50,9 @@ void onPirReport(bool motion, uint8_t srcEndpoint, uint16_t shortAddr) {
   lastPirReportMs = millis();
 
   markPirReport(srcEndpoint, shortAddr, motion);
+  publishMotionEvent(motion, shortAddr);
 
-  logf(
-    "PIR report: %s from short=0x%04X endpoint=%u | %s\n",
-    motion ? "MOTION" : "CLEAR",
-    shortAddr,
-    srcEndpoint,
-    modeName()
-  );
+  logf("PIR %s 0x%04X:%u\n", motion ? "MOTION" : "CLEAR", shortAddr, srcEndpoint);
 
   if (currentMode == MODE_AUTO_PIR) {
     pendingAlarmAction = motion ? ALARM_ACTION_ON : ALARM_ACTION_OFF;
@@ -80,7 +76,8 @@ void onBatteryReport(uint8_t percent, uint8_t srcEndpoint, uint16_t shortAddr) {
   lastBatteryReportMs = now;
 
   markBatteryReport(srcEndpoint, shortAddr, percent);
-  Serial.printf("Battery report: %u%% from short=0x%04X endpoint=%u\n", percent, shortAddr, srcEndpoint);
+  logf("Bat %u%% 0x%04X:%u\n", percent, shortAddr, srcEndpoint);
+  publishBatteryEvent(percent, shortAddr);
 }
 
 void handlePendingAlarmAction() {
@@ -118,4 +115,5 @@ void checkPirTimeout() {
 
   lastPirMotion = false;  // tránh lặp lại failsafe mỗi vòng loop
   pendingAlarmAction = ALARM_ACTION_OFF;
+  // pir_timeout_failsafe không nằm trong 3 event gửi cloud (motion/clear/battery) - chỉ giữ log local ở trên.
 }

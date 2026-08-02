@@ -29,12 +29,7 @@ void reportPirState(bool motion, const char *reason) {
   bool updated = zbPir.setOccupancy(motion);
   bool reported = updated && zbPir.report();
 
-  Serial.printf(
-    "PIR %s | reason=%s | report=%s\n",
-    motion ? "MOTION" : "CLEAR",
-    reason,
-    reported ? "OK" : "FAIL"
-  );
+  Serial.printf("PIR %s %s %s\n", motion ? "MOTION" : "CLEAR", reason, reported ? "OK" : "FAIL");
 }
 
 void waitForNetwork() {

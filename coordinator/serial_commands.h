@@ -15,24 +15,14 @@ void printHelp() {
   Serial.println("  mode1/auto - PIR node controls alarm node");
   Serial.println("  mode2/man  - manual control only");
   Serial.println("  list       - print saved bound devices");
-  Serial.println("  bound      - print raw Zigbee bound devices");
   Serial.println("  open       - open Zigbee network for pairing");
   Serial.println("  close      - close Zigbee network");
   Serial.println("  on         - turn alarm/light ON");
   Serial.println("  off        - turn alarm/light OFF");
-  Serial.println("  toggle     - toggle alarm/light");
   Serial.println("  state      - read alarm/light state");
-  Serial.println("  test       - turn ON for 2 seconds, then OFF");
   Serial.println("  reset      - Zigbee factory reset");
-  Serial.printf("  verbose    - toggle full auto-event log (currently %s)\n", verboseLog ? "ON" : "OFF");
+  Serial.printf("  debug      - toggle full auto-event log (currently %s)\n", verboseLog ? "ON" : "OFF");
   Serial.println();
-}
-
-void printRawBoundDevices() {
-  Serial.println("Switch/alarm bound devices:");
-  zbSwitch.printBoundDevices(Serial);
-  Serial.println("PIR receiver bound devices:");
-  zbPirReceiver.printBoundDevices(Serial);
 }
 
 void printDevices() {
@@ -119,8 +109,6 @@ void handleCommand(String command) {
     setMode(MODE_MANUAL);
   } else if (command == "list") {
     printDevices();
-  } else if (command == "bound") {
-    printRawBoundDevices();
   } else if (command == "open") {
     Serial.printf("Opening Zigbee network for %u seconds...\n", JOIN_OPEN_SECONDS);
     Zigbee.openNetwork(JOIN_OPEN_SECONDS);
@@ -131,15 +119,9 @@ void handleCommand(String command) {
     sendAlarmOn();
   } else if (command == "off") {
     sendAlarmOff();
-  } else if (command == "toggle") {
-    sendAlarmToggle();
   } else if (command == "state") {
     readAlarmState();
-  } else if (command == "test") {
-    sendAlarmOn();
-    delay(2000);
-    sendAlarmOff();
-  } else if (command == "verbose") {
+  } else if (command == "debug") {
     verboseLog = !verboseLog;
     Serial.printf("Verbose auto-event log: %s\n", verboseLog ? "ON" : "OFF");
   } else if (command == "reset") {

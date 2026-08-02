@@ -35,5 +35,5 @@ void reportBattery() {
   zbPir.setBatteryPercentage(percent);
   zbPir.setBatteryVoltage(voltage100mv);
   zbPir.reportBatteryPercentage();  // thử lại - sketch test chạy được khi setPowerSource() có đủ voltage
-  Serial.printf("Battery: %u%% (%.1fV)\n", percent, voltage100mv / 10.0);
+  Serial.printf("Bat %u%% %.1fV\n", percent, voltage100mv / 10.0);
 }
