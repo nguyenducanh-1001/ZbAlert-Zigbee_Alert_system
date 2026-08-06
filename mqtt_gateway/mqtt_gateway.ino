@@ -7,19 +7,19 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
-  setupUartBridge();
   connectWiFi();
-  setupMqtt();
+  setupUartBridge();
+  setupBlynk();
 
-  Serial.println("MQTT gateway (ESP32-C3) started. Cho du lieu tu ESP32-C6 qua UART...");
+  Serial.println("Blynk gateway (ESP32-C3/S3) started. Cho du lieu tu ESP32-C6 qua UART...");
 }
 
 void loop() {
   ensureWifiConnected();
-  ensureMqttConnected();
-  mqttClient.loop();
+
+  if (ensureBlynkConnected()) {
+    Blynk.run();
+  }
 
   handleUartBridge();
-
-  delay(10);
 }

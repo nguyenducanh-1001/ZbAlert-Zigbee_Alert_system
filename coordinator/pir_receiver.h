@@ -141,6 +141,14 @@ private:
       return;
     }
 
+    // 0xFFFF (broadcast short addr) va 255 (wildcard endpoint) khong phai dia
+    // chi thiet bi that - loc ngay tai day de khong ton 1 lan bind request
+    // chac chan fail (status=133 timeout). Truoc day chi loc o addOrUpdateDevice()
+    // ben device_registry.h, tuc la sau khi da gui bind request roi.
+    if (addr == 0xFFFF || endpoint == 0xFF) {
+      return;
+    }
+
     zb_device_params_t *sensor = (zb_device_params_t *)calloc(1, sizeof(zb_device_params_t));
     if (sensor == nullptr) {
       Serial.println("Cannot allocate PIR device record.");

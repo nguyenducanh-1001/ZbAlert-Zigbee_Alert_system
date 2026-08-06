@@ -24,7 +24,7 @@ void printTarget(uint8_t index, const char *action, bool announce) {
   );
 }
 
-void sendAlarmOn(bool announce = true) {
+void sendAlarmOn(bool announce) {
   syncBoundDevices();
   int index = firstAlarmDevice();
   announceNextStateReport = announce;
@@ -45,7 +45,7 @@ void sendAlarmOn(bool announce = true) {
   }
 }
 
-void sendAlarmOff(bool announce = true) {
+void sendAlarmOff(bool announce) {
   syncBoundDevices();
   int index = firstAlarmDevice();
   announceNextStateReport = announce;
@@ -92,7 +92,7 @@ void onLightStateChange(bool state) {
     Serial.printf("Light/alarm state report: %s\n", state ? "ON" : "OFF");
   }
   announceNextStateReport = false;
-  // Alarm không nằm trong 3 event gửi cloud (motion/clear/battery) - chỉ giữ log local.
+  publishAlarmEvent(state);
 
   for (uint8_t i = 0; i < MAX_DEVICES; i++) {
     if (devices[i].active && devices[i].endpoint == ALARM_ENDPOINT) {

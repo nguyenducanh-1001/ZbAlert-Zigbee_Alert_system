@@ -6,12 +6,11 @@
 
 #include "pir_receiver.h"
 #include "endpoints.h"
-#include "uart_link.h"
 #include "device_registry.h"
 #include "alarm_control.h"
+#include "uart_link.h"
 #include "pir_handler.h"
 #include "serial_commands.h"
-#include "ota_server.h"
 
 void setup() {
 #ifdef RGB_BUILTIN
@@ -62,6 +61,7 @@ void loop() {
   handlePendingAlarmAction();
   checkPirTimeout();
   checkDevicesOffline();
+  handleUartCommand();
 
   static unsigned long lastScan = 0;
   if (millis() - lastScan >= DEVICE_SCAN_INTERVAL_MS) {

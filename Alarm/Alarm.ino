@@ -6,7 +6,7 @@
 bool lastConnected = false;
 
 void setup() {
-  rgbLedWrite(RGB_BUILTIN, 0, 0, 0); // tắt LED RGB tích hợp
+  rgbLedWrite(RGB_BUILTIN, 0, 0, 0); // turn off RGB
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -17,7 +17,7 @@ void setup() {
 
   zbAlarm.setManufacturerAndModel("Espressif", "AlarmNode");
 
-  // callback nhận lệnh On/Off từ coordinator
+  // callback function receive On/Off from coordinator
   zbAlarm.onLightChange(setAlarmState);
 
   Zigbee.addEndpoint(&zbAlarm);

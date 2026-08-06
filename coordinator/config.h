@@ -22,7 +22,13 @@
 
 #define MOTION_TIMEOUT_MS 30000UL
 
-#define DEVICE_OFFLINE_TIMEOUT_MS 30000UL
+// PHỤ THUỘC vào node PIR: node dùng deep sleep, thức định kỳ mỗi
+// WAKE_TIME_TO_SLEEP_S (hiện = 60s, xem sensor.ino/config.h bên node) để gửi
+// heartbeat. Ngưỡng này PHẢI lớn hơn chu kỳ đó với biên độ dư (khuyến nghị
+// ~2-3 lần) để không báo offline/online lặp lại mỗi phút giữa 2 lần node
+// thức - 30s cũ ngắn hơn cả chu kỳ ngủ bình thường nên chắc chắn báo sai.
+// Nếu sau này đổi WAKE_TIME_TO_SLEEP_S bên node, nhớ đổi giá trị này theo.
+#define DEVICE_OFFLINE_TIMEOUT_MS 150000UL  // 150s ~ 2.5 x chu ky ngu 60s
 
 enum CoordinatorMode : uint8_t {
   MODE_AUTO_PIR = 1,
